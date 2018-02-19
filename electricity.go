@@ -1,4 +1,4 @@
-package electricity
+package atys
 
 import (
 	"encoding/json"
@@ -10,8 +10,8 @@ import (
 )
 
 type mailgunConfiguration struct {
-	toEmails, fromEmail []string
-	mailgunApiKey       string
+	ToEmails, FromEmail []string
+	MailgunApiKey       string
 }
 
 const (
@@ -36,13 +36,14 @@ func StartChecker() error {
 }
 
 func sendAlertEmail(m mailgunConfiguration) {
+	fmt.Println(m)
 	formData := make(url.Values)
-	formData["from"] = m.fromEmail
-	formData["to"] = m.toEmails
+	formData["from"] = m.FromEmail
+	formData["to"] = m.ToEmails
 	formData["subject"] = []string{"NO tinc electricitat!"}
 	formData["text"] = []string{fmt.Sprintf("Última trucada registrada: %v", getLastCallTime())}
 
-	url := fmt.Sprintf("https://api:%v@api.mailgun.net/v3/xsimov.com/messages", m.mailgunApiKey)
+	url := fmt.Sprintf("https://api:%v@api.mailgun.net/v3/xsimov.com/messages", m.MailgunApiKey)
 	resp, _ := http.PostForm(url, formData)
 	fmt.Println(resp.Status)
 }
