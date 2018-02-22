@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -33,6 +34,7 @@ func StartChecker() error {
 		case <-time.After(5 * time.Second):
 			if lastCallWasMoreThan30MinAgo(&lastCallWas) && notNotifiedToday() {
 				sendAlertEmail(mailgunConfig, lastCallWas)
+				markAsAlreadyNotified()
 			}
 		}
 	}
@@ -90,4 +92,14 @@ func getTimestampFromFile(path string) time.Time {
 		return time.Time{}
 	}
 	return t
+}
+
+func markAsAlreadyNotified() error {
+	f, err := os.Create(lastNotifiedFilePath)
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(f, "%v", time.Now())
+	return nil
 }
