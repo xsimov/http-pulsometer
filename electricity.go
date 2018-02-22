@@ -60,7 +60,7 @@ func lastCallWasMoreThan30MinAgo(t *time.Time) bool {
 func notNotifiedToday() bool {
 	lastNotifiedAt := getTimestampFromFile(lastNotifiedFilePath)
 	dayStart, dayEnd := dayBoundaries()
-	return lastNotifiedAt.After(dayStart) && lastNotifiedAt.Before(dayEnd)
+	return !(lastNotifiedAt.After(dayStart) && lastNotifiedAt.Before(dayEnd))
 }
 
 func setEmailConfig() (mailgunConfiguration, error) {
@@ -77,7 +77,7 @@ func setEmailConfig() (mailgunConfiguration, error) {
 
 func dayBoundaries() (start time.Time, end time.Time) {
 	t := time.Now()
-	start, _ = time.Parse(tLayout, fmt.Sprintf("%d%d%dT00:00:00Z", t.Year(), t.Month(), t.Day()))
+	start, err := time.Parse(tLayout, fmt.Sprintf("%04d-%02d-%02dT00:00:00Z", t.Year(), t.Month(), t.Day()))
 	end = start.Add(24 * time.Hour)
 	return
 }
@@ -100,6 +100,6 @@ func markAsAlreadyNotified() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(f, "%v", time.Now())
+	fmt.Fprintf(f, "%v", time.Now().Format(tLayout))
 	return nil
 }
