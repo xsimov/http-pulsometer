@@ -15,8 +15,9 @@ type mailgunConfiguration struct {
 }
 
 const (
-	timestampFilePath = "/tmp/atys_last_call"
-	tLayout           = time.RFC3339
+	lastCallFilePath     = "/tmp/atys_last_call"
+	lastNotifiedFilePath = "/tmp/atys_last_notified_at"
+	tLayout              = time.RFC3339
 )
 
 func StartChecker() error {
@@ -25,32 +26,39 @@ func StartChecker() error {
 		return fmt.Errorf("could not load email config: %v", err)
 	}
 
+	var lastCallWas time.Time
+
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			if lastCallWasMoreThan30MinAgo() {
-				sendAlertEmail(mailgunConfig)
+			if lastCallWasMoreThan30MinAgo(&lastCallWas) && notNotifiedToday() {
+				sendAlertEmail(mailgunConfig, lastCallWas)
 			}
 		}
 	}
 }
 
-func sendAlertEmail(m mailgunConfiguration) {
-	fmt.Println(m)
+func sendAlertEmail(m mailgunConfiguration, t time.Time) {
 	formData := make(url.Values)
 	formData["from"] = m.FromEmail
 	formData["to"] = m.ToEmails
 	formData["subject"] = []string{"NO tinc electricitat!"}
-	formData["text"] = []string{fmt.Sprintf("Última trucada registrada: %v", getLastCallTime())}
+	formData["text"] = []string{fmt.Sprintf("Última trucada registrada: %v", t)}
 
 	url := fmt.Sprintf("https://api:%v@api.mailgun.net/v3/xsimov.com/messages", m.MailgunApiKey)
 	resp, _ := http.PostForm(url, formData)
 	fmt.Println(resp.Status)
 }
 
-func lastCallWasMoreThan30MinAgo() bool {
-	lastCall := getLastCallTime()
-	return time.Since(lastCall) > 30*time.Minute
+func lastCallWasMoreThan30MinAgo(t *time.Time) bool {
+	*t = getTimestampFromFile(lastCallFilePath)
+	return time.Since(*t) > 30*time.Minute
+}
+
+func notNotifiedToday() bool {
+	lastNotifiedAt := getTimestampFromFile(lastNotifiedFilePath)
+	dayStart, dayEnd := dayBoundaries()
+	return lastNotifiedAt.After(dayStart) && lastNotifiedAt.Before(dayEnd)
 }
 
 func setEmailConfig() (mailgunConfiguration, error) {
@@ -65,14 +73,21 @@ func setEmailConfig() (mailgunConfiguration, error) {
 	return c, nil
 }
 
-func getLastCallTime() time.Time {
-	strTime, err := ioutil.ReadFile(timestampFilePath)
+func dayBoundaries() (start time.Time, end time.Time) {
+	t := time.Now()
+	start, _ = time.Parse(tLayout, fmt.Sprintf("%d%d%dT00:00:00Z", t.Year(), t.Month(), t.Day()))
+	end = start.Add(24 * time.Hour)
+	return
+}
+
+func getTimestampFromFile(path string) time.Time {
+	strTime, err := ioutil.ReadFile(path)
 	if err != nil {
 		return time.Time{}
 	}
-	lastCallTime, err := time.Parse(tLayout, string(strTime))
+	t, err := time.Parse(tLayout, string(strTime))
 	if err != nil {
 		return time.Time{}
 	}
-	return lastCallTime
+	return t
 }
