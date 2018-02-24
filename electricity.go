@@ -16,20 +16,21 @@ type mailgunConfiguration struct {
 }
 
 const (
-	heartbeatFilePath   = "/tmp/atys_last_call"
-	emailSentAtFilePath = "/tmp/atys_last_notified_at"
+	heartbeatFilePath   = "/tmp/pdd_pulsometer_heartbeat_received_at"
+	emailSentAtFilePath = "/tmp/pdd_pulsometer_email_sent_at"
 	tLayout             = time.RFC3339
 )
 
-func HeartbeatReceived() error {
-	return saveTimestampToDisk(heartbeatFilePath)
+func HeartbeatReceived() {
+	saveTimestampToDisk(heartbeatFilePath)
 }
 
-func StartPulsometer() error {
-	mailgunConfig, err := setEmailConfig()
-	if err != nil {
-		return fmt.Errorf("could not load email config: %v", err)
-	}
+func StartPulsometer() {
+	mailgunConfig, _ := setEmailConfig()
+	// TODO: catch and log the possible errors when setting email config
+	// if err != nil {
+	// 	return fmt.Errorf("could not load email config: %v", err)
+	// }
 
 	var lastHeartbeat time.Time
 
@@ -98,12 +99,12 @@ func getTimestampFromFile(path string) time.Time {
 	return t
 }
 
-func saveTimestampToDisk(filePath string) error {
-	f, err := os.Create(filePath)
+func saveTimestampToDisk(filePath string) {
+	f, _ := os.Create(filePath)
 	defer f.Close()
-	if err != nil {
-		return err
-	}
+	// TODO: catch and log the possible errors opening the file
+	// if err != nil {
+	// 	return err
+	// }
 	fmt.Fprintf(f, "%v", time.Now().Format(tLayout))
-	return nil
 }
