@@ -1,4 +1,4 @@
-package atys
+package main
 
 import (
 	"encoding/json"
@@ -16,25 +16,29 @@ type mailgunConfiguration struct {
 }
 
 const (
-	lastCallFilePath     = "/tmp/atys_last_call"
-	lastNotifiedFilePath = "/tmp/atys_last_notified_at"
-	tLayout              = time.RFC3339
+	heartbeatFilePath   = "/tmp/atys_last_call"
+	emailSentAtFilePath = "/tmp/atys_last_notified_at"
+	tLayout             = time.RFC3339
 )
 
-func StartChecker() error {
+func HeartbeatReceived() error {
+	return saveTimestampToDisk(heartbeatFilePath)
+}
+
+func StartPulsometer() error {
 	mailgunConfig, err := setEmailConfig()
 	if err != nil {
 		return fmt.Errorf("could not load email config: %v", err)
 	}
 
-	var lastCallWas time.Time
+	var lastHeartbeat time.Time
 
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			if lastCallWasMoreThan30MinAgo(&lastCallWas) && notNotifiedToday() {
-				sendAlertEmail(mailgunConfig, lastCallWas)
-				markAsAlreadyNotified()
+			if lastHeartbeatWasMoreThan30MinAgo(&lastHeartbeat) && notNotifiedToday() {
+				sendAlertEmail(mailgunConfig, lastHeartbeat)
+				saveTimestampToDisk(emailSentAtFilePath)
 			}
 		}
 	}
@@ -52,15 +56,15 @@ func sendAlertEmail(m mailgunConfiguration, t time.Time) {
 	fmt.Println(resp.Status)
 }
 
-func lastCallWasMoreThan30MinAgo(t *time.Time) bool {
-	*t = getTimestampFromFile(lastCallFilePath)
+func lastHeartbeatWasMoreThan30MinAgo(t *time.Time) bool {
+	*t = getTimestampFromFile(heartbeatFilePath)
 	return time.Since(*t) > 30*time.Minute
 }
 
 func notNotifiedToday() bool {
-	lastNotifiedAt := getTimestampFromFile(lastNotifiedFilePath)
+	emailSentAt := getTimestampFromFile(emailSentAtFilePath)
 	dayStart, dayEnd := dayBoundaries()
-	return !(lastNotifiedAt.After(dayStart) && lastNotifiedAt.Before(dayEnd))
+	return !(emailSentAt.After(dayStart) && emailSentAt.Before(dayEnd))
 }
 
 func setEmailConfig() (mailgunConfiguration, error) {
@@ -94,8 +98,8 @@ func getTimestampFromFile(path string) time.Time {
 	return t
 }
 
-func markAsAlreadyNotified() error {
-	f, err := os.Create(lastNotifiedFilePath)
+func saveTimestampToDisk(filePath string) error {
+	f, err := os.Create(filePath)
 	defer f.Close()
 	if err != nil {
 		return err
